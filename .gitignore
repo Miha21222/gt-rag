@@ -1,0 +1,12 @@
+# local content — not distributed (course material is copyrighted)
+data/
+manifest.json
+
+# environment
+.venv/
+__pycache__/
+*.pyc
+
+# logs & scratch
+*.log
+*.err
