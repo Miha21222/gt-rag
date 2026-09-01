@@ -1,6 +1,12 @@
 # local content — not distributed (course material is copyrighted)
 data/
 manifest.json
+cryptology-manifest.json
+style-crosscheck-candidates.json
+style-overrides.json
+transcript-import-manifest.json
+crosscheck_styles.py
+scrape_cryptology.mjs
 
 # environment
 .venv/

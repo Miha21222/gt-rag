@@ -17,12 +17,22 @@ def main() -> None:
     ap.add_argument("--top-k", type=int, default=5)
     ap.add_argument("--block", type=int, default=None)
     ap.add_argument("--type", dest="type_", default=None)
+    ap.add_argument("--trading-style", default=None)
     args = ap.parse_args()
 
-    for h in GTSearch().search(args.query, top_k=args.top_k, block=args.block, type_=args.type_):
+    for h in GTSearch().search(
+        args.query,
+        top_k=args.top_k,
+        block=args.block,
+        type_=args.type_,
+        trading_style=args.trading_style,
+    ):
         m = h.metadata
         sec = f" › {m['section']}" if m.get("section") else ""
-        print(f"[{h.score:.3f}] ({m['type']}, block {m['block']}) {m['title']}{sec}")
+        print(
+            f"[{h.score:.3f}] ({m['type']}, block {m['block']}, "
+            f"{m.get('trading_style', '?')}) {m['title']}{sec}"
+        )
         preview = h.text.replace("\n", " ")
         print(f"    {preview[:220]}...\n")
 

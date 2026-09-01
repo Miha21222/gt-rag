@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "label": "Для интрадей и свинга",
+  "method": {
+    "candidate_report": "style-crosscheck-candidates.json",
+    "semantic_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "review": "Mutual cross-corpus similarity plus manual section-level applicability review"
+  },
+  "overrides": []
+}

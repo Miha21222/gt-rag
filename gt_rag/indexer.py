@@ -8,7 +8,7 @@ from __future__ import annotations
 from .common import (
     RAW_DIR,
     chunk_page,
-    file_hash,
+    index_hash,
     load_state,
     parse_front_matter,
     save_state,
@@ -49,7 +49,7 @@ def ingest(
     pages: dict[str, int] = {}
     total = 0
     for path in files:
-        h = file_hash(path)
+        h = index_hash(path)
         slug = path.stem
         if state.get(slug) == h:
             continue

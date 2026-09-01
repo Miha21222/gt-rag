@@ -72,8 +72,14 @@ One markdown file per page in `data/raw/`, YAML frontmatter required:
 title: "Dealing Range | Premium & Discount"
 notion_url: "https://..."        # optional source link, any URL or ""
 block: 3                          # optional module/section number, or omit
-type: "lesson"                    # lesson | conference | qa | homework |
-                                  # terminology | info | transcript | your own
+type: "lesson"                    # lesson | guide | conference | qa |
+                                  # homework | terminology | info |
+                                  # transcript | your own
+trading_style: "Для интрадей"     # Для свинга | Для интрадей |
+                                  # Для интрадей и свинга
+course: "Cryptology Flow"         # optional source/course grouping
+course_level: "Junior"            # optional package/module grouping
+market: "general"                 # optional: general | crypto | forex
 slug: "b3-dealing-range"          # must match the filename stem
 crawled_at: "2026-08-27"          # optional
 ---
@@ -109,10 +115,17 @@ Content:
 
 | Tool | Purpose |
 |---|---|
-| `gt_search(query, top_k, block, type)` | hybrid search; returns scored chunks with slug, section, text |
+| `gt_search(query, top_k, block, type, trading_style)` | hybrid search; returns scored chunks with slug, section, text |
 | `gt_get_page(slug)` | full markdown of one page |
 | `gt_list_pages()` | inventory: title, block, type, slug, indexed status |
 | `gt_image_path(link)` | resolve a markdown image link to an absolute path |
+
+Filtering by `Для свинга` or `Для интрадей` also includes audited shared
+sections tagged `Для интрадей и свинга`. Section-level cross-style decisions
+and their semantic evidence are stored in the local `style-overrides.json`
+(start from `style-overrides.example.json`). Changes to that file automatically
+make only affected pages stale for incremental ingest. Corpus-specific
+overrides and audit reports are gitignored because they can contain course text.
 
 Maintenance:
 

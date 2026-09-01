@@ -12,7 +12,15 @@ from __future__ import annotations
 import re
 import time
 
-from .common import RAW_DIR, ROOT, file_hash, load_state, parse_front_matter
+from .common import (
+    RAW_DIR,
+    ROOT,
+    chunk_page,
+    index_hash,
+    load_state,
+    load_style_overrides,
+    parse_front_matter,
+)
 
 IMAGES_DIR = ROOT / "data" / "images"
 IMG_LINK_RE = re.compile(r"!\[[^\]]*\]\(\.\./images/([^)]+)\)")
@@ -28,13 +36,24 @@ def _check_raw_files() -> dict:
     bad: list[str] = []
     for p in files:
         try:
-            meta, _ = parse_front_matter(p.read_text(encoding="utf-8"))
+            meta, body = parse_front_matter(p.read_text(encoding="utf-8"))
         except Exception as e:
             bad.append(f"{p.name}: unreadable frontmatter ({e})")
             continue
         missing = [k for k in REQUIRED_META if not meta.get(k)]
         if missing:
             bad.append(f"{p.name}: missing frontmatter keys {missing}")
+            continue
+        try:
+            chunk_page(meta, body)
+        except Exception as e:
+            bad.append(f"{p.name}: invalid chunk metadata ({e})")
+    try:
+        override_slugs = {slug for slug, _ in load_style_overrides()}
+        missing_slugs = sorted(override_slugs - {p.stem for p in files})
+        bad.extend(f"style override references missing slug: {slug}" for slug in missing_slugs)
+    except Exception as e:
+        bad.append(f"style-overrides.json: {e}")
     status = "error" if not files else ("warn" if bad else "ok")
     return {"name": "raw_files", "status": status,
             "file_count": len(files), "problems": bad}
@@ -56,10 +75,13 @@ def _check_collection() -> dict:
 
 
 def _check_index_freshness() -> dict:
-    state = load_state()
-    files = {p.stem: p for p in sorted(RAW_DIR.glob("*.md"))} if RAW_DIR.is_dir() else {}
-    stale = [s for s, p in files.items() if state.get(s) not in (None, file_hash(p))
-             ]
+    try:
+        state = load_state()
+        files = {p.stem: p for p in sorted(RAW_DIR.glob("*.md"))} if RAW_DIR.is_dir() else {}
+        stale = [s for s, p in files.items() if state.get(s) not in (None, index_hash(p))]
+    except Exception as e:
+        return {"name": "index_freshness", "status": "error",
+                "detail": f"could not calculate index freshness: {e}"}
     unindexed = [s for s in files if s not in state]
     orphan_state = [s for s in state if s not in files]
     ok = not (stale or unindexed or orphan_state)

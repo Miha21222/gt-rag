@@ -14,9 +14,16 @@ RAW_DIR = ROOT / "data" / "raw"
 CHROMA_DIR = ROOT / "data" / "chroma"
 STATE_FILE = ROOT / "data" / "index_state.json"
 MANIFEST_FILE = ROOT / "manifest.json"
+STYLE_OVERRIDES_FILE = ROOT / "style-overrides.json"
 
 COLLECTION_NAME = "gt_database"
 EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+INDEX_SCHEMA_VERSION = 2
+VALID_TRADING_STYLES = {
+    "Для свинга",
+    "Для интрадей",
+    "Для интрадей и свинга",
+}
 
 # Chunking parameters (characters, not tokens; multilingual MiniLM window is
 # small so keep chunks compact).
@@ -37,6 +44,45 @@ def load_manifest() -> dict:
 
 def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_style_overrides() -> dict[tuple[str, str], str]:
+    """Return audited section-level trading-style overrides."""
+    if not STYLE_OVERRIDES_FILE.exists():
+        return {}
+    data = json.loads(STYLE_OVERRIDES_FILE.read_text(encoding="utf-8"))
+    result: dict[tuple[str, str], str] = {}
+    for item in data.get("overrides", []):
+        style = item.get("trading_style", data.get("label", ""))
+        sections = item.get("sections")
+        if style not in VALID_TRADING_STYLES:
+            raise ValueError(f"invalid trading style override: {style!r}")
+        if not item.get("slug") or not isinstance(sections, list) or not sections:
+            raise ValueError("style override requires a slug and a non-empty sections list")
+        for section in sections:
+            if not isinstance(section, str) or not section:
+                raise ValueError("style override sections must be non-empty strings")
+            key = (item["slug"], section)
+            previous = result.get(key)
+            if previous and previous != style:
+                raise ValueError(f"conflicting style overrides for {key}")
+            result[key] = style
+    return result
+
+
+def index_hash(path: Path) -> str:
+    """Hash source, index schema, and the style overrides affecting this page."""
+    overrides = sorted(
+        (section, style)
+        for (slug, section), style in load_style_overrides().items()
+        if slug == path.stem
+    )
+    digest = hashlib.sha256(path.read_bytes())
+    digest.update(b"\0index-schema\0")
+    digest.update(str(INDEX_SCHEMA_VERSION).encode("ascii"))
+    digest.update(b"\0style-overrides\0")
+    digest.update(json.dumps(overrides, ensure_ascii=False).encode("utf-8"))
+    return digest.hexdigest()
 
 
 def load_state() -> dict:
@@ -102,23 +148,63 @@ def chunk_page(meta: dict, body: str) -> list[Chunk]:
     """Chunk one page into section-level chunks with metadata."""
     slug = meta.get("slug", "unknown")
     title = meta.get("title", slug)
+    base_trading_style = str(meta.get("trading_style", "Для свинга"))
+    if base_trading_style not in VALID_TRADING_STYLES:
+        raise ValueError(f"invalid trading style in {slug}: {base_trading_style!r}")
     base_meta = {
         "title": title,
         "slug": slug,
         "type": str(meta.get("type", "")),
         "block": -1 if meta.get("block") is None else int(meta["block"]),
         "notion_url": meta.get("notion_url", ""),
+        "trading_style": base_trading_style,
+        "base_trading_style": base_trading_style,
     }
+    for key in (
+        "source_url",
+        "guide_url",
+        "course",
+        "course_level",
+        "source_kind",
+        "lesson_label",
+        "lesson_number",
+        "market",
+        "review_url",
+        "source_video_url",
+        "source_video_file",
+        "source_video_size",
+        "source_video_sha256",
+        "source_bundle_file",
+        "source_bundle_sha256",
+        "duration_seconds",
+        "transcript_segments",
+        "whisper_model",
+    ):
+        value = meta.get(key)
+        if value is not None and value != "":
+            base_meta[key] = value
     sections = split_sections(body)
     if not sections:
         sections = [("", body.strip())] if body.strip() else []
     chunks: list[Chunk] = []
+    style_overrides = load_style_overrides()
+    overridden_sections = {
+        section for (override_slug, section) in style_overrides
+        if override_slug == slug
+    }
+    missing_sections = overridden_sections - {title for title, _ in sections}
+    if missing_sections:
+        missing = ", ".join(sorted(missing_sections))
+        raise ValueError(f"style overrides reference missing sections in {slug}: {missing}")
     idx = 0
     for sec_title, sec_text in sections:
         for win in window_text(sec_text):
             header = f"{title}" + (f" — {sec_title}" if sec_title else "")
             text = f"{header}\n\n{win}"
             md = dict(base_meta)
+            md["trading_style"] = style_overrides.get(
+                (slug, sec_title), base_trading_style
+            )
             md["section"] = sec_title
             md["chunk_index"] = idx
             chunks.append(Chunk(chunk_id=f"{slug}#{idx}", text=text, metadata=md))

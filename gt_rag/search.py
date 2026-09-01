@@ -16,6 +16,9 @@ VECTOR_WEIGHT = 0.65
 FUZZY_WEIGHT = 0.35
 # how many vector candidates to pull before re-ranking
 CANDIDATE_MULTIPLIER = 4
+SWING_STYLE = "Для свинга"
+INTRADAY_STYLE = "Для интрадей"
+COMBINED_STYLE = "Для интрадей и свинга"
 
 
 @dataclass
@@ -30,12 +33,24 @@ class GTSearch:
     def __init__(self) -> None:
         self.col = get_collection()
 
-    def _where(self, block: int | None, type_: str | None) -> dict | None:
+    def _where(
+        self,
+        block: int | None,
+        type_: str | None,
+        trading_style: str | None,
+    ) -> dict | None:
         clauses = []
         if block is not None:
             clauses.append({"block": block})
         if type_:
             clauses.append({"type": type_})
+        if trading_style:
+            if trading_style in (SWING_STYLE, INTRADAY_STYLE):
+                clauses.append({
+                    "trading_style": {"$in": [trading_style, COMBINED_STYLE]}
+                })
+            else:
+                clauses.append({"trading_style": trading_style})
         if not clauses:
             return None
         return clauses[0] if len(clauses) == 1 else {"$and": clauses}
@@ -46,12 +61,13 @@ class GTSearch:
         top_k: int = 5,
         block: int | None = None,
         type_: str | None = None,
+        trading_style: str | None = None,
     ) -> list[Hit]:
         n = max(top_k * CANDIDATE_MULTIPLIER, 20)
         res = self.col.query(
             query_texts=[query],
             n_results=min(n, max(self.col.count(), 1)),
-            where=self._where(block, type_),
+            where=self._where(block, type_, trading_style),
             include=["documents", "metadatas", "distances"],
         )
         ids = res["ids"][0]
