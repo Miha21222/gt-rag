@@ -63,6 +63,33 @@ claude mcp add gt-database -- "<abs-path>\gt-rag\.venv\Scripts\python.exe" "<abs
 
 (Linux/macOS: same commands with `.venv/bin/python`.)
 
+## Embedding in another application
+
+The server is meant to be shippable: an app can carry the code, the content and
+a prebuilt index and hand each of them a different directory.
+
+| Variable | What it moves | Written to? |
+|---|---|---|
+| `GT_RAG_DATA` | the whole data directory (default `<repo>/data`) | yes |
+| `GT_RAG_RAW` | the source markdown only | no |
+| `GT_RAG_IMAGES` | the image archive only | no |
+
+The split exists because **ChromaDB opens its sqlite store read-write even to
+answer a query**, and an incremental re-index rewrites `index_state.json`: the
+store must live somewhere writable, while `raw/` and `images/` can stay in a
+read-only installation directory. `manifest.json` and `style-overrides.json` are
+read next to the code and need no variable.
+
+Set `PYTHONIOENCODING=utf-8` when you spawn the server on Windows. The content is
+Russian and the tools answer in JSON on stdout; a console default of cp1251 turns
+the first «→» in a hit into a `UnicodeEncodeError` mid-answer.
+
+`server.py` runs on either MCP backend: it uses **fastmcp** when the environment
+has one and falls back to `mcp>=2` (what `requirements.txt` installs) otherwise.
+Both expose the same eight tools. This is what lets a host that already runs a
+fastmcp server — which pins `mcp<2` — put gt-rag in the same environment instead
+of building a second one for it.
+
 ## Data format
 
 One markdown file per page in `data/raw/`, YAML frontmatter required:

@@ -21,11 +21,9 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from mcp.server.mcpserver import MCPServer
-
 from gt_rag.common import (
+    IMAGES_DIR,
     RAW_DIR,
-    ROOT,
     index_hash,
     load_state,
     load_style_overrides,
@@ -56,11 +54,24 @@ first; gt_doctor(fix=True) applies safe repairs; gt_reindex(rebuild=True)
 is the last resort (full re-embed, minutes of work).
 """
 
-mcp = MCPServer(
-    "gt-database",
-    description="RAG knowledge base of the GT trading course (Smart Money/ICT)",
-    instructions=INSTRUCTIONS,
-)
+# Two possible backends, because a host may already own the Python environment
+# this server runs in. `mcp` 2.x is what a standalone install gets from
+# requirements.txt; `fastmcp` (which pins mcp<2) is what a host that also runs a
+# fastmcp server — Strategy Desk, which bundles tvmcp — already has. Both expose
+# the same `@mcp.tool()` decorator and a stdio `run()`, so the tools below do not
+# care which one is in the environment.
+try:
+    from fastmcp import FastMCP
+
+    mcp = FastMCP("gt-database", instructions=INSTRUCTIONS)
+except ModuleNotFoundError:
+    from mcp.server.mcpserver import MCPServer
+
+    mcp = MCPServer(
+        "gt-database",
+        description="RAG knowledge base of the GT trading course (Smart Money/ICT)",
+        instructions=INSTRUCTIONS,
+    )
 
 _searcher: GTSearch | None = None
 
@@ -192,10 +203,9 @@ def gt_image_path(link: str) -> str:
         link: as it appears in markdown, e.g. '../images/b3-dealing-range/img-01.png'
               or 'b3-dealing-range/img-01.png'.
     """
-    images_dir = ROOT / "data" / "images"
     prefix = "../images/"
     relative = link[len(prefix):] if link.startswith(prefix) else link
-    path = _resolve_under(images_dir, relative)
+    path = _resolve_under(IMAGES_DIR, relative)
     if path is None:
         return _dump({"path": None, "exists": False, "error": "invalid image path"})
     return _dump({

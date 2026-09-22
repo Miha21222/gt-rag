@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,9 +11,28 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-RAW_DIR = ROOT / "data" / "raw"
-CHROMA_DIR = ROOT / "data" / "chroma"
-STATE_FILE = ROOT / "data" / "index_state.json"
+
+
+def _dir_from_env(var: str, default: Path) -> Path:
+    """An env override for a directory, so the code can be shipped read-only.
+
+    A host that installs gt-rag (Strategy Desk does) puts the code where it
+    cannot be written to and the data where it can: ChromaDB opens its sqlite
+    file read-write even for a plain query, and an incremental re-index writes
+    index_state.json next to it. `GT_RAG_DATA` moves the whole writable set;
+    `GT_RAG_RAW` and `GT_RAG_IMAGES` move the two read-only halves — the source
+    markdown and the image archive — which may therefore stay next to the
+    installed code instead of being copied per user.
+    """
+    raw = (os.environ.get(var) or "").strip()
+    return Path(raw).expanduser().resolve() if raw else default
+
+
+DATA_DIR = _dir_from_env("GT_RAG_DATA", ROOT / "data")
+RAW_DIR = _dir_from_env("GT_RAG_RAW", DATA_DIR / "raw")
+CHROMA_DIR = DATA_DIR / "chroma"
+IMAGES_DIR = _dir_from_env("GT_RAG_IMAGES", DATA_DIR / "images")
+STATE_FILE = DATA_DIR / "index_state.json"
 MANIFEST_FILE = ROOT / "manifest.json"
 STYLE_OVERRIDES_FILE = ROOT / "style-overrides.json"
 

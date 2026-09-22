@@ -13,8 +13,8 @@ import re
 import time
 
 from .common import (
+    IMAGES_DIR,
     RAW_DIR,
-    ROOT,
     chunk_page,
     index_hash,
     load_state,
@@ -22,7 +22,6 @@ from .common import (
     parse_front_matter,
 )
 
-IMAGES_DIR = ROOT / "data" / "images"
 IMG_LINK_RE = re.compile(r"!\[[^\]]*\]\(\.\./images/([^)]+)\)")
 REQUIRED_META = ("title", "slug", "type")
 
