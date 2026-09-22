@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gt_rag.common import (
     IMAGES_DIR,
@@ -29,7 +30,9 @@ from gt_rag.common import (
     load_style_overrides,
     parse_front_matter,
 )
-from gt_rag.search import GTSearch
+
+if TYPE_CHECKING:  # chromadb and fastembed are imported lazily; see searcher()
+    from gt_rag.search import GTSearch
 
 INSTRUCTIONS = """\
 Knowledge base of a Russian-language Smart Money / ICT trading course
@@ -73,12 +76,21 @@ except ModuleNotFoundError:
         instructions=INSTRUCTIONS,
     )
 
-_searcher: GTSearch | None = None
+_searcher: "GTSearch | None" = None
 
 
-def searcher() -> GTSearch:
+def searcher() -> "GTSearch":
+    """The search stack, built on first use.
+
+    Importing it costs the chromadb and fastembed import chain - about 1.5 s
+    warm and over ten on a cold filesystem - and a host that starts this server
+    at session start waits for that before it may list the tools. The tools
+    that do not search (pages, images, list) should not pay it at all.
+    """
     global _searcher
     if _searcher is None:
+        from gt_rag.search import GTSearch
+
         _searcher = GTSearch()
     return _searcher
 
