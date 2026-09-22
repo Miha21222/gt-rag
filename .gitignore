@@ -7,6 +7,7 @@ style-overrides.json
 transcript-import-manifest.json
 crosscheck_styles.py
 scrape_cryptology.mjs
+scrape_cryptology_notion.mjs
 
 # environment
 .venv/
@@ -16,3 +17,5 @@ __pycache__/
 # logs & scratch
 *.log
 *.err
+download_cryptology_videos.mjs
+quiz_cryptology.mjs
